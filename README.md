@@ -6,6 +6,7 @@ Snapshot of the agent skills installed in `~/.agents/skills`, kept here to recor
 |---|---|---|
 | `mattpocock/` | [mattpocock/skills](https://github.com/mattpocock/skills) | MIT (`mattpocock/LICENSE`) |
 | `nature/` | [Yuan1z0825/nature-skills](https://github.com/Yuan1z0825/nature-skills) | Apache-2.0 (`nature/LICENSE`) |
+| `cmi-hpc/` | local, from [luketou/mdgen_neighbor](https://github.com/luketou/mdgen_neighbor) `.claude/skills/hpc-workflow` | none |
 
 Upstream hashes come from `~/.agents/.skill-lock.json` (`skillFolderHash`). Running `npx skills update` overwrites the local changes listed below; restore them from this repo.
 
