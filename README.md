@@ -6,7 +6,7 @@ Snapshot of the agent skills installed in `~/.agents/skills`, kept here to recor
 |---|---|---|
 | `mattpocock/` | [mattpocock/skills](https://github.com/mattpocock/skills) | MIT (`mattpocock/LICENSE`) |
 | `nature/` | [Yuan1z0825/nature-skills](https://github.com/Yuan1z0825/nature-skills) | Apache-2.0 (`nature/LICENSE`) |
-| `cmi-hpc/` | local, from [luketou/mdgen_neighbor](https://github.com/luketou/mdgen_neighbor) `.claude/skills/hpc-workflow` | none |
+| `cmi-hpc/` | local, rewritten from [luketou/mdgen_neighbor](https://github.com/luketou/mdgen_neighbor) `.claude/skills/hpc-workflow`; `reference.md` (connection, node hardware, node selection, submit) and `scripts/` (`hpc_run.py`, `smoke_cpu.sh`) added 2026-11-22 | none |
 | `m5-hpc/` | local, m5 RTX 4090 cluster workflow | none |
 | `slurm_alias/` | local, Slurm HPC alias shortcuts (`q`, `qs`, `pbs`) and node monitor | none |
 
@@ -132,7 +132,7 @@ Upstream hashes come from `~/.agents/.skill-lock.json` (`skillFolderHash`). Runn
 
 | Skill / Tool | 呼叫方式 | 功能 | 使用時機 |
 |---|---|---|---|
-| `cmi-hpc` | 自動 / 手動 | CMI Slurm HPC job 的提交、smoke test、佇列與失敗分析 | 在 Slurm 叢集上跑分片工作與大規模運算時 |
+| `cmi-hpc` | 自動 / 手動 | CMI Slurm HPC 的選節點、job 提交（含 `scripts/hpc_run.py`）、smoke test、佇列與失敗分析 | 在 Slurm 叢集上選分區／節點、提交 job、跑分片工作與大規模運算時；連線、硬體與指令見 `cmi-hpc/reference.md` |
 | `m5-hpc` | 自動 / 手動 | m5 主機群（RTX 4090，無 Slurm，用 tmux）的部署與訓練流程 | 在 m5 cluster 跑 GPU 訓練或生成時 |
 | `slurm-alias` | Shell / 手動 | Slurm 常用別名（`q`, `qs`, `pbs`）與節點/GPU 資源即時監看腳本 | 在 Slurm 叢集查詢排程、尋找空閒 GPU/CPU 節點或監控資源時（詳見 [`slurm_alias/README.md`](slurm_alias/README.md)） |
 

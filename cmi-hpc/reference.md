@@ -23,16 +23,17 @@ wsl -d Ubuntu -e bash -c "ssh -o BatchMode=yes -o ConnectTimeout=10 r15543056@zi
 | 分區 | 節點 | 每節點資源 | 時間上限 | 帳號 |
 |---|---|---|---|---|
 | `l40s`（預設） | node-201 | 2× NVIDIA L40S 46 GB、16 vCPU（Xeon GraniteRapids）、62 GB RAM | 7 天 | 只收 `l40s`，腳本已寫 `--account=l40s` |
-| `llm` | node-181 | 同 node-201 | 7 天 | 只收 `llm`；本帳號的 job 永遠 pending（`Job's account not permitted`），`sbatch --test-only` 不會發現 |
-| `v100-32g` | node-202～204 可用（205～208 DOWN） | 1× V100 32 GB、4 vCPU、29 GB RAM | 7 天 | 全部 |
+| `llm` | node-181 | 2× L40S 46 GB（nvidia-smi 實測），Xeon GraniteRapids | 7 天 | 只收 `llm`；本帳號的 job 永遠 pending（`Job's account not permitted`），`sbatch --test-only` 不會發現 |
+| `v100-32g` | node-202～204 可用（205～208 DOWN） | 1× Tesla V100-SXM2-32GB（32768 MiB）、4 vCPU（Xeon Skylake, IBRS）、29 GB RAM | 7 天 | 全部 |
 | `rtx3080` | node-171 | 3× RTX 3080 10 GB、6 vCPU（AMD EPYC-Milan）、46 GB RAM | 7 天 | 全部 |
-| `ccchou` | node-191 | 同 node-171 | 7 天 | 標示全部，但疑似特定實驗室專用，先確認再用 |
-| `rtx2080ti` | node-141、143、144、162 | 1× RTX 2080 Ti 11 GB、2 vCPU、15 GB RAM | 7 天 | 全部 |
-| `cpu-2g` | node-11～13（44 核 / 500 GB）、node-14（96 核 / 500 GB，Xeon E7-8890 v4）、node-19（80 核 / 124 GB） | 純 CPU | 28 天 | 全部 |
-| `cpu-3g` | node-17、18 | 36 核（Xeon Gold 6354）、250 GB RAM | 28 天 | 全部 |
+| `ccchou` | node-191 | 3× RTX 3080 10240 MiB、AMD EPYC-Milan（同 node-171） | 7 天 | 標示全部，但疑似特定實驗室專用，先確認再用 |
+| `rtx2080ti` | node-141、143、144、162 | 1× GeForce RTX 2080 Ti（11264 MiB）、2 vCPU（Xeon Cascadelake）、15 GB RAM | 7 天 | 全部 |
+| `cpu-2g` | node-11～13（44 核 / 500 GB；node-12、13 為 E5-2699 v4，node-11 拒絕 ssh 型號未知）、node-14（96 核 / 500 GB，E7-8890 v4）、node-19（80 核 / 124 GB，Xeon Gold 6230） | 純 CPU | 28 天 | 全部 |
+| `cpu-3g` | node-17、18 | 36 核（Xeon Gold 6354，node-17、18 皆實測）、250 GB RAM | 28 天 | 全部 |
 
 要點：
 
+- 實測狀態（2026-11-22）：CPU 型號、GPU 名稱／顯存為節點上 `lscpu`／`nvidia-smi` 實測。**只有 `l40s`、`cpu-2g` 的 job 實際跑過**；`v100-32g`（job 55532，`-A users --gres=gpu:1 -c2 --mem=8G`）與 `rtx3080`（job 55533，同）排隊 10 分鐘仍 pending（V100 `Priority`，3080 `Resources`；當時 node-171 被別人 3 個 job 佔滿、V100 三節點各有他人 job 且另有排隊），已取消，**未驗證：排隊逾時**，帳號 `users` 是否被接受、`nvidia-smi -L` 皆未驗證。`rtx2080ti` 未送測。
 - L40S 只有 **2 張**，且與其他使用者共用，常有一張被佔；自己同時最多用 2 張，並盡量讓兩張都有 job。
 - 其他 GPU 節點的 CPU 與 RAM 很少（2～6 核、15～47 GB），`num_workers` 與資料載入要照節點調低。
 - 排程器 `priority/basic`（先送先跑）搭配 backfill；沒有 fairshare。
@@ -42,10 +43,12 @@ wsl -d Ubuntu -e bash -c "ssh -o BatchMode=yes -o ConnectTimeout=10 r15543056@zi
 | 任務 | 分區 | 資源建議 |
 |---|---|---|
 | 大模型訓練／微調、長序列、MDgen 全長蛋白、LLM LoRA／DoRA 與評估 | `l40s` | 單 job 單 GPU；`-c 8 --mem 30G`，讓兩張卡各跑一個 |
-| 中型訓練、要 32 GB 顯存但不需 L40S 速度 | `v100-32g` | 1 GPU、≤4 核、≤28 GB RAM；V100 無原生 bf16，先用 fp16／fp32 smoke 驗證 |
+| 中型訓練、要 32 GB 顯存但不需 L40S 速度 | `v100-32g` | 1 GPU、≤4 核、≤28 GB RAM；V100 無原生 bf16（硬體常識，未實測；該分區任何 job 皆未驗證），先用 fp16／fp32 smoke 驗證 |
 | 小模型、除錯、單元測試、GPU smoke | `rtx3080`（10 GB） | 10 GB 是硬上限，放不下就換節點，不縮小到失去代表性 |
 | 極小 GPU 測試、環境驗證 | `rtx2080ti`（11 GB） | 只有 2 核 15 GB RAM |
 | 前處理、特徵萃取、DARTS／LightGBM 等 CPU 基線、評估統計、下載資料 | `cpu-2g`／`cpu-3g` | 高記憶體或多核用 node-11～14；`cpu-3g` 常被大量 job 佔滿 |
+
+上表除 `l40s`、`cpu-2g` 外皆為依硬體規格的推算，非實測；正式送 `v100-32g`／`rtx3080` 前先 smoke，且預期尖峰時要排隊。
 
 選擇順序：顯存需求 → CPU／RAM 瓶頸 → 佇列（`squeue -h -o '%P %T' | sort | uniq -c`）。smoke 通過的分區就是正式提交的分區；換分區要重做 smoke。
 
@@ -99,7 +102,7 @@ python $HPC_RUN fetch <run_id> <本機目錄> results/smoke.txt
 ```bash
 sbatch -p l40s -A l40s --gres=gpu:1 -c 8 --mem=30G -t 12:00:00 \
        -J <名稱> -o logs/%j.out -e logs/%j.err job/<launcher>.sh
-# 其他分區：-p v100-32g -A users --gres=gpu:1 -c 4 --mem=28G
+# 其他分區（推算、未實測）：-p v100-32g -A users --gres=gpu:1 -c 4 --mem=28G
 # CPU：     -p cpu-2g   -A users -c 32 --mem=120G -t 1-00:00:00
 ```
 
