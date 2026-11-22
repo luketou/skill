@@ -5,11 +5,11 @@ description: CMI Slurm HPC 的 job 工作流程：選分區與節點、部署程
 
 # CMI HPC 工作流程
 
-連線（經 WSL）、節點硬體、任務選節點與 `sbatch`／`hpc_run.py` 指令都在 [reference.md](reference.md)，動手前先對照。專案內若有 `hpc/project.yaml` 與 `job/README.md`，其資源設定為候選值。MDgen 的 GPU 工作優先用 [m5-hpc](../m5-hpc/SKILL.md)（RTX 4090，無 Slurm）；需要 L40S、V100、CPU 節點或大量分片才用本 skill。
+連線（經 WSL）、節點硬體、任務選節點與 `sbatch`／`hpc_run.py` 指令都在 [reference.md](reference.md)，動手前先對照。`$HPC_RUN` 指本 skill 的 `scripts/hpc_run.py`（設定見 reference.md §4.1），在專案 repo 根目錄執行。專案內若有 `hpc/project.yaml` 與 `job/README.md`，其資源設定為候選值。MDgen 的 GPU 工作優先用 [m5-hpc](../m5-hpc/SKILL.md)（RTX 4090，無 Slurm）；需要 L40S、V100、CPU 節點或大量分片才用本 skill。
 
 ## 步驟
 
-1. **接手**：`python scripts/hpc_run.py history`（或查 `<run>/job_history`）找出先前的 run ID 與 Job ID，確認 worktree、分支、dirty diff。
+1. **接手**：`python $HPC_RUN history`（或查 `<run>/job_history`）找出先前的 run ID 與 Job ID，確認 worktree、分支、dirty diff。
    完成：知道哪些 job 在跑、已結束、各對應哪個快照。
 
 2. **選分區**：依 reference.md §3 的顯存、CPU／RAM 需求選分區，並查佇列與 `df -h /share/home/r15543056`。

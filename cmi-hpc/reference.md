@@ -51,17 +51,25 @@ wsl -d Ubuntu -e bash -c "ssh -o BatchMode=yes -o ConnectTimeout=10 r15543056@zi
 
 ## 4. 提交 job
 
-### 4.1 標準路徑：`scripts/hpc_run.py`（有此腳本的專案）
+### 4.1 標準路徑：`scripts/hpc_run.py`
 
-由 repo 根目錄執行；工具建立唯讀快照、核對 SHA-256、把 `src/results`、`src/logs` 連到 run 目錄、提交並記到 `<run>/job_history` 與本機 `hpc_job_history`。
+腳本隨 skill 提供（`cmi-hpc/scripts/hpc_run.py`，安裝後通常是 `~/.agents/skills/cmi-hpc/scripts/hpc_run.py`），不需要複製進專案。**在要部署的專案 repo 根目錄執行**（它從目前目錄往上找 `.git` 當快照根）：
 
 ```bash
-python scripts/hpc_run.py submit --tag smoke job/<launcher>.sh <args>        # 新快照 + smoke
-python scripts/hpc_run.py submit --run <run_id> job/<launcher>.sh <args>     # 沿用同一快照正式送
-python scripts/hpc_run.py status <run_id>
-python scripts/hpc_run.py tail <run_id> logs/<job>.out
-python scripts/hpc_run.py fetch <run_id> <本機目錄> results/x.json logs/<job>.out   # 單次上限 20 MiB
-python scripts/hpc_run.py history
+HPC_RUN=~/.agents/skills/cmi-hpc/scripts/hpc_run.py   # 依實際安裝位置調整
+```
+
+預設值是 MDgen 專案（`HPC_TARGET`、`HPC_RUNS_ROOT`、`HPC_RESOURCE_ROOT`、`HPC_VENV` 環境變數可覆寫）；其他專案先設 `HPC_RUNS_ROOT` 與 `HPC_VENV`。launcher 讀 `MDGEN_VENV`／`MDGEN_RESOURCE_ROOT`／`MDGEN_RUN_DIR`。專案若仍有自己的 `scripts/hpc_run.py` 也可繼續用。
+
+工具工具建立唯讀快照、核對 SHA-256、把 `src/results`、`src/logs` 連到 run 目錄、提交並記到 `<run>/job_history` 與本機 `hpc_job_history`。
+
+```bash
+python $HPC_RUN submit --tag smoke job/<launcher>.sh <args>        # 新快照 + smoke
+python $HPC_RUN submit --run <run_id> job/<launcher>.sh <args>     # 沿用同一快照正式送
+python $HPC_RUN status <run_id>
+python $HPC_RUN tail <run_id> logs/<job>.out
+python $HPC_RUN fetch <run_id> <本機目錄> results/x.json logs/<job>.out   # 單次上限 20 MiB
+python $HPC_RUN history
 ```
 
 - 覆寫分區：`--sbatch=--partition=v100-32g --sbatch=--account=users`（命令列優先於腳本內的 `#SBATCH`）。
