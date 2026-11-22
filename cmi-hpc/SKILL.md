@@ -1,39 +1,42 @@
 ---
 name: cmi-hpc
-description: HPC（Slurm）job 的提交與查詢：部署程式快照、smoke test、大量分片提交、查佇列與失敗原因、取回結果，以及把 server 上的數字存成驗證紀錄。
+description: CMI Slurm HPC 的 job 工作流程：選分區與節點、部署程式快照、smoke test、大量提交、查佇列與失敗原因、取回結果並留下驗證紀錄。連線方式、硬體清單與提交指令見 reference.md。
 ---
 
-# HPC 工作流程
+# CMI HPC 工作流程
 
-本機到 HPC 一律經 `scripts/hpc_run.py`（`submit`／`status`／`tail`／`fetch`／`history`），用法見 [job/README.md](https://github.com/luketou/mdgen_neighbor/blob/main/job/README.md)。叢集限制與已踩過的坑在 [HPC 操作入口](https://github.com/luketou/mdgen_neighbor/blob/main/docs/validation/hpc/README.md)：分區、priority、空間、WSL worktree 的提交方式，每一步動手前先對照。MDgen 相關 GPU 工作優先用 m5 主機群的 RTX 4090（無 Slurm，用 tmux），規則見 [m5 主機群](https://github.com/luketou/mdgen_neighbor/blob/main/docs/validation/hpc/m5.md)；以下步驟針對 Slurm HPC。
+連線（經 WSL）、節點硬體、任務選節點與 `sbatch`／`hpc_run.py` 指令都在 [reference.md](reference.md)，動手前先對照。專案內若有 `hpc/project.yaml` 與 `job/README.md`，其資源設定為候選值。MDgen 的 GPU 工作優先用 [m5-hpc](../m5-hpc/SKILL.md)（RTX 4090，無 Slurm）；需要 L40S、V100、CPU 節點或大量分片才用本 skill。
 
 ## 步驟
 
-1. **接手**：`python scripts/hpc_run.py history` 找出先前的 run ID 與 Job ID，確認 worktree、分支與 dirty diff。
-   完成：知道哪些 job 還在跑、哪些已結束、各自對應哪個快照。
+1. **接手**：`python scripts/hpc_run.py history`（或查 `<run>/job_history`）找出先前的 run ID 與 Job ID，確認 worktree、分支、dirty diff。
+   完成：知道哪些 job 在跑、已結束、各對應哪個快照。
 
-2. **本機檢查**：在 WSL 跑 `bash scripts/check.sh`。快照只帶 tracked 檔，以及 `job/`、`scripts/`、`mdgen/`、`hpc/` 底下的 untracked 檔；新的測試先 commit。
+2. **選分區**：依 reference.md §3 的顯存、CPU／RAM 需求選分區，並查佇列與 `df -h /share/home/r15543056`。
+   完成：分區、GPU 數、`-c`／`--mem`、時間上限已決定。
+
+3. **本機檢查**：跑專案的本地檢查（如 WSL `bash scripts/check.sh`）；新測試先 commit。
    完成：exit 0。
 
-3. **Smoke**：用正式 launcher 與正式入口、最小輸入送一個 job（`submit --tag <名稱> job/<launcher>.sh ...`）。
-   完成：job 離開佇列；`.out` 開頭有拿到 GPU（不是 `No devices were found`）；產物 JSON 的狀態欄位是成功；量到單 case 時間與輸出大小。只拿到 Job ID 不算完成。
+4. **Smoke**：用正式 launcher 與入口、最小輸入、**同一分區**送一個 job。
+   完成：job 離開佇列；`.out` 開頭有拿到 GPU；產物狀態成功；量到單 case 時間、顯存峰值與輸出大小。只拿到 Job ID 不算完成。
 
-4. **估算**：以 smoke 的單 case 時間與輸出大小乘上矩陣規模，對照 `df -h /share/home/r15543056`、launcher 的時間上限與可用 GPU 數。
-   完成：總輸出放得下、單 case 不會逼近時間上限；放不下就先和使用者確認存法或縮減範圍。
+5. **估算**：單 case 時間與輸出大小 × 矩陣規模，對照剩餘空間、時間上限、可用 GPU 數。
+   完成：放得下、不逼近時間上限；放不下先與使用者確認。
 
-5. **正式提交**：沿用通過 smoke 的同一快照（`submit --run <run_id>`）；程式有變更就建立新快照並重做 smoke。只用 `l40s` 分區；大量 job 加 `--sbatch=--nice=10000`，讓其他工作先跑；少量需要優先的用 nice 0。逐筆記錄分片 → Job ID；任何一筆 submit 失敗或結果不明就停，先查 `history` 與 `squeue`，從中斷處續送。
-   完成：預期數量全部有 Job ID，`squeue` 的 pending 原因是 `Priority` 或 `Resources`。
+6. **正式提交**：沿用 smoke 的快照（`--run <run_id>`）；程式有變就新快照並重做 smoke。大量 job 加 `--nice=10000`。逐筆記錄分片 → Job ID；任何一筆失敗或結果不明就停，先查 `history` 與 `squeue`，從中斷處續送。
+   完成：預期數量都有 Job ID，pending 原因是 `Priority` 或 `Resources`。
 
-6. **監看**：遠端查詢先寫成腳本檔，再以 `wsl -d Ubuntu -e bash -c "ssh <target> 'bash -s' < <腳本>"` 執行。結束的 job 先讀 `logs/<job>.out`／`.err`；逾時會出現 `DUE TO TIME LIMIT`。最長的設定（最大幀數、最長蛋白）第一批跑完就核對時間。
-   完成：知道完成數、失敗數與各自原因；有逾時風險時趁還在排隊取消重送。
+7. **監看**：遠端查詢寫成腳本檔經 WSL 執行；結束的 job 先讀 `.out`／`.err`（逾時為 `DUE TO TIME LIMIT`）；最長設定第一批跑完就核對時間。
+   完成：知道完成數、失敗數與原因；有逾時風險趁排隊取消重送。
 
-7. **取回與紀錄**：用 `fetch` 只取小型 JSON 與 log（單次上限 20 MiB），大型張量留在 server。README 引用的每個 server 數字（空間、檔案大小、雜湊、佇列狀態）都存成同目錄的 log，指令與原始輸出一起寫入。
-   完成：每個數字都能在同目錄找到出處（`CODING_STANDARDS.md` 的規定），`check.sh` 通過。
+8. **取回與紀錄**：只 `fetch` 小型 JSON 與 log，大型張量留在 server。README 引用的每個 server 數字（空間、大小、雜湊、佇列狀態）連同指令與原始輸出存成同目錄 log。
+   完成：每個數字都找得到出處，專案檢查通過。
 
 ## 失敗與授權
 
-OOM、沒拿到 GPU、逾時、程式錯誤與 `submission_unknown` 分開記錄並保留 log；沒拿到 GPU 不是 OOM，不當成量測結果。同一快照重送時，在 run 目錄的 `job_history` 補記先前失敗或取消的 job 與原因。
+OOM、沒拿到 GPU、逾時、程式錯誤與 `submission_unknown` 分開記錄並保留 log；沒拿到 GPU 不是 OOM。同一快照重送時，在 run 的 `job_history` 補記先前失敗或取消的 job 與原因。
 
-恢復訓練建立新 run，指定確切的來源 checkpoint 並記錄父 run；完成標準是成功繼續一步，不是只載入模型。
+恢復訓練建立新 run，指定確切來源 checkpoint 並記錄父 run；完成標準是成功繼續一步。
 
-`hpc/project.yaml` 的資源設定是候選值，不是授權；清理或覆寫既有 run、checkpoint、結果，以及超出使用者已授權範圍的資源，都先取得使用者明確同意。
+資源設定是候選值，不是授權；清理或覆寫既有 run、checkpoint、結果，以及超出使用者已授權範圍的資源，都先取得明確同意。
