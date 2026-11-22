@@ -61,7 +61,7 @@ HPC_RUN=~/.agents/skills/cmi-hpc/scripts/hpc_run.py   # 依實際安裝位置調
 
 預設值是 MDgen 專案（`HPC_TARGET`、`HPC_RUNS_ROOT`、`HPC_RESOURCE_ROOT`、`HPC_VENV` 環境變數可覆寫）；其他專案先設 `HPC_RUNS_ROOT` 與 `HPC_VENV`。launcher 讀 `MDGEN_VENV`／`MDGEN_RESOURCE_ROOT`／`MDGEN_RUN_DIR`。專案若仍有自己的 `scripts/hpc_run.py` 也可繼續用。
 
-工具工具建立唯讀快照、核對 SHA-256、把 `src/results`、`src/logs` 連到 run 目錄、提交並記到 `<run>/job_history` 與本機 `hpc_job_history`。
+工具建立唯讀快照、核對 SHA-256、把 `src/results`、`src/logs` 連到 run 目錄、提交並記到 `<run>/job_history` 與本機 `hpc_job_history`。
 
 ```bash
 python $HPC_RUN submit --tag smoke job/<launcher>.sh <args>        # 新快照 + smoke
