@@ -78,6 +78,20 @@ python $HPC_RUN history
 - 快照只帶 tracked 檔，加 `job/`、`scripts/`、`mdgen/`、`hpc/` 底下的 untracked 檔；新測試先 commit。
 - 在 WSL 建的 worktree，Windows git 讀不到；`hpc_run.py` 會自動處理，其他工具（`gh pr create` 等）要先設 `GIT_DIR`／`GIT_WORK_TREE`。
 
+### 4.1.1 CPU 流程 smoke（驗證提交流程用）
+
+`scripts/smoke_cpu.sh` 在 `cpu-2g`（`-A users`、1 核、1 GB、5 分鐘）印出節點與快照路徑、寫 `results/smoke.txt`、結尾印 `SMOKE_OK`。複製到專案 `job/` 後送出（`job/` 底下的 untracked 檔會被上傳）：
+
+```bash
+cp ~/.agents/skills/cmi-hpc/scripts/smoke_cpu.sh job/
+python $HPC_RUN submit --tag smoke job/smoke_cpu.sh
+python $HPC_RUN status <run_id>
+python $HPC_RUN tail <run_id>
+python $HPC_RUN fetch <run_id> <本機目錄> results/smoke.txt
+```
+
+2026-11-22 驗證：job 55531 在 node-19 數秒內跑完，`SMOKE_OK`，`fetch` 成功。用完刪掉複製進專案的檔案，避免 dirty。
+
 ### 4.2 沒有提交工具的專案：手動 `sbatch`
 
 快照放共享儲存（`/share/home/r15543056/<專案>/hpc_runs/<run_id>`），程式、輸出、log 分開；腳本內用絕對 Python 路徑並 `module load`（預設 `python/3.11.12-gpu cuda/12.8`）。
@@ -93,6 +107,7 @@ sbatch -p l40s -A l40s --gres=gpu:1 -c 8 --mem=30G -t 12:00:00 \
 
 ### 4.3 優先序與排隊
 
+- smoke 與少量 job 不加 nice（加了會排在別人後面，2026-11-22 一個 L40S smoke 因此等了 10 分鐘以上仍 pending）。
 - 一次送大量 job：加 `--nice=10000`（`hpc_run.py` 用 `--sbatch=--nice=10000`），讓其他工作先跑；需要優先的少量 job 用 nice 0。只能調高 nice；`scontrol update Priority=` 不持久。
 - 要讓已送出的 job 排在另一批之後：`scontrol update JobId=<id> Dependency=afterany:<id1>:<id2>…`。事後調高 nice 無效。
 - 取消：`scancel <id>`；有逾時風險的趁還在排隊取消重送。
